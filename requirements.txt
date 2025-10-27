@@ -1,0 +1,8 @@
+huggingface_hub>=0.24
+transformers>=4.57
+tokenizers>=0.22
+accelerate>=1.11
+huggingface_hub>=0.24
+transformers>=4.57
+tokenizers>=0.22
+accelerate>=1.11

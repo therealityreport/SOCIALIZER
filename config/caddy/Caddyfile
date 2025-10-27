@@ -1,0 +1,24 @@
+{
+    email {$LETSENCRYPT_EMAIL}
+    auto_https on
+}
+
+{$APP_HOST} {
+    encode gzip
+    reverse_proxy frontend:4173
+}
+
+{$API_HOST} {
+    encode gzip
+    reverse_proxy backend:8000
+}
+
+{$FLOWER_HOST} {
+    encode gzip
+    reverse_proxy flower:5555
+}
+
+{$ML_HOST} {
+    encode gzip
+    reverse_proxy ml-inference:8500
+}

@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socializer-backend
+  labels:
+    app: socializer-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: socializer-backend
+  template:
+    metadata:
+      labels:
+        app: socializer-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/your-org/socializer-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: AZURE_TEXT_ANALYTICS_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: AZURE_TEXT_ANALYTICS_ENDPOINT
+            - name: AZURE_TEXT_ANALYTICS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: AZURE_TEXT_ANALYTICS_KEY
+            - name: PRIMARY_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: PRIMARY_MODEL
+            - name: FALLBACK_SERVICE
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: FALLBACK_SERVICE
+            - name: CONFIDENCE_THRESHOLD
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: CONFIDENCE_THRESHOLD
+            - name: STORAGE_ACCOUNT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: STORAGE_ACCOUNT_NAME
+            - name: STORAGE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: STORAGE_ACCOUNT_KEY
+            - name: STORAGE_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: STORAGE_CONTAINER
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

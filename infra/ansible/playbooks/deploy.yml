@@ -1,0 +1,31 @@
+---
+- name: Deploy Socializer backend infrastructure
+  hosts: localhost
+  connection: local
+  vars:
+    terraform_directory: "{{ playbook_dir }}/../../terraform"
+    kubernetes_manifests:
+      - "{{ playbook_dir }}/../../kubernetes/backend/deployment.yaml"
+      - "{{ playbook_dir }}/../../kubernetes/backend/service.yaml"
+      - "{{ playbook_dir }}/../../kubernetes/backend/ingress.yaml"
+  tasks:
+    - name: Ensure Terraform providers are downloaded
+      ansible.builtin.command: terraform init
+      args:
+        chdir: "{{ terraform_directory }}"
+
+    - name: Plan Terraform changes
+      ansible.builtin.command: terraform plan -out=tfplan
+      args:
+        chdir: "{{ terraform_directory }}"
+
+    - name: Apply Terraform plan
+      ansible.builtin.command: terraform apply -auto-approve tfplan
+      args:
+        chdir: "{{ terraform_directory }}"
+
+    - name: Deploy backend Kubernetes manifests
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ item }}"
+      loop: "{{ kubernetes_manifests }}"

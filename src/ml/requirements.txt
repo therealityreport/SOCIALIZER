@@ -1,0 +1,14 @@
+# Core ML stack
+torch>=2.3.0
+transformers>=4.44.0
+datasets>=3.0.0
+
+# Serving and config
+fastapi>=0.112.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+pydantic-settings>=2.3.0
+
+# Utilities
+numpy>=1.26.0
+scikit-learn>=1.5.0
