@@ -62,6 +62,82 @@ This document summarizes the primary REST endpoints exposed by the SOCIALIZER ba
 - **Purpose:** Retrieve analytics for a single cast member within a thread.
 - **Response:** `CastAnalytics` payload or `404` if not found.
 
+### GET `/episode-discussions/{id}/mentions`
+- **Purpose:** Retrieve detailed mention data including LLM-analyzed sentiment and computed signal fields.
+- **Response:**
+  ```json
+  {
+    "mentions": [
+      {
+        "id": 123,
+        "comment_id": 456,
+        "cast_member": "jane-doe",
+        "sentiment_primary": "POSITIVE",
+        "sentiment_secondary": "Admiration/Support",
+        "emotions": [
+          {"label": "joy", "score": 0.87},
+          {"label": "amusement", "score": 0.65}
+        ],
+        "sarcasm_score": 0.42,
+        "sarcasm_label": "not_sarcastic",
+        "sarcasm_evidence": null,
+        "emoji_count": 2,
+        "has_gif": false,
+        "has_image": true,
+        "has_video": false,
+        "domains": ["imgur.com"],
+        "hashtag_count": 1,
+        "all_caps_ratio": 0.05,
+        "punctuation_intensity": 0.12,
+        "negation_count": 0,
+        "question": false,
+        "toxicity": 0.08,
+        "depth": 2,
+        "replies": 5,
+        "awards": 1,
+        "velocity": 5.6,
+        "controversy": 0.27,
+        "weight_upvotes": 114,
+        "cast_ids": ["jane-doe"],
+        "created_utc": 1609459200,
+        "text": "She absolutely killed it! 😍"
+      }
+    ],
+    "total": 150,
+    "page": 1,
+    "page_size": 50
+  }
+  ```
+
+**Signal Field Definitions**:
+- **LLM-Analyzed Fields**:
+  - `sentiment_primary`: Positive, Neutral, or Negative
+  - `sentiment_secondary`: Fine-grained attitude (Admiration/Support, Shady/Humor, Analytical, Annoyed, Hatred/Disgust, Sadness/Sympathy/Distress)
+  - `emotions`: Array of emotion labels and confidence scores
+  - `sarcasm_score`: 0.0-1.0 sarcasm probability
+  - `sarcasm_label`: "sarcastic" or "not_sarcastic"
+  - `sarcasm_evidence`: Text snippet supporting sarcasm detection
+
+- **Computed Signal Fields**:
+  - `emoji_count`: Number of emojis in comment
+  - `has_gif`: Boolean indicating GIF presence
+  - `has_image`: Boolean indicating image URL presence
+  - `has_video`: Boolean indicating video URL presence
+  - `domains`: Array of external domains linked in comment
+  - `hashtag_count`: Number of hashtags
+  - `all_caps_ratio`: Proportion of text in ALL-CAPS
+  - `punctuation_intensity`: Exclamation/question mark density
+  - `negation_count`: Number of negation words
+  - `question`: Boolean indicating question form
+  - `toxicity`: 0.0-1.0 toxicity score
+  - `depth`: Comment thread depth (replies to replies)
+  - `replies`: Number of direct replies
+  - `awards`: Number of Reddit awards received
+  - `velocity`: Comments per hour rate
+  - `controversy`: Vote disagreement metric (0.0-1.0)
+  - `weight_upvotes`: Upvote count used for weighting
+  - `cast_ids`: Array of cast member slugs mentioned
+
 ### GET `/cast/{cast_slug}/history`
 - **Purpose:** Cross-thread history for a cast member.
 - **Response:** Contains cast metadata plus an array of thread entries (`overall` + window metrics).

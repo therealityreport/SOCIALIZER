@@ -385,6 +385,45 @@ This document provides a complete, prioritized task list for building the SOCIAL
   - **Priority**: P1
   - **Estimate**: 16 hours
 
+### Backend - LLM Integration & Signal Extraction
+- [ ] **BE-LLM-001**: Implement LLM-based sentiment/attitude/emotion/sarcasm pipeline
+  - Integrate LLM for primary sentiment analysis (Positive/Neutral/Negative)
+  - Extract secondary attitude (Admiration/Support, Shady/Humor, Analytical, Annoyed, Hatred/Disgust, Sadness/Sympathy/Distress)
+  - Implement emotion extraction (joy, amusement, disgust, etc.)
+  - Add sarcasm detection with score, label, and evidence
+  - **Assignee**: ML Engineer + Backend Engineer
+  - **Priority**: P0
+  - **Estimate**: 24 hours
+
+- [ ] **BE-LLM-002**: Integrate rule-based signal extractor for emojis, media, and engagement metrics
+  - Implement emoji count and polarity extraction
+  - Add GIF/image/video detection from URLs
+  - Extract hashtag count and ALL-CAPS ratio
+  - Calculate punctuation intensity, negation count, and question detection
+  - Track engagement metrics (depth, replies, awards, velocity)
+  - Compute controversy index using vote patterns
+  - **Assignee**: Backend Engineer
+  - **Priority**: P0
+  - **Estimate**: 20 hours
+
+- [ ] **BE-LLM-003**: Weight all sentiment calculations by upvotes_new
+  - Modify aggregation logic to multiply sentiment by upvote weight
+  - Implement weighted_mean(score, weight = upvotes_new * confidence)
+  - Update all per-cast and episode aggregates accordingly
+  - Add confidence-weighted scoring
+  - **Assignee**: Backend Engineer
+  - **Priority**: P0
+  - **Estimate**: 12 hours
+
+- [ ] **BE-LLM-004**: Extend schemas and aggregation logic for new fields
+  - Update Mention model with LLM output fields (sentiment_secondary, emotions, sarcasm_*)
+  - Add signal fields to schema (emoji_count, has_gif, has_image, has_video, domains, etc.)
+  - Update database migrations
+  - Extend aggregation service to include new metrics
+  - **Assignee**: Backend Engineer
+  - **Priority**: P0
+  - **Estimate**: 16 hours
+
 ### Backend - Analytics Engine
 - [x] **BE-MVP-012**: Implement vote-weighted sentiment aggregation
   - Create aggregation function with vote weighting formula

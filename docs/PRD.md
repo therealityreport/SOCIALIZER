@@ -23,6 +23,27 @@
 - **Audience Insights**: New vs returning commenters, super-commenter influence, locale proxies
 - **Language Analysis**: Slang lexicon tracking (200+ terms), comparative extraction ("better than"), emoji analysis
 
+## Features
+
+### Comment & Sentiment Analysis
+
+**LLM-Driven Analysis**: Primary sentiment (Positive/Neutral/Negative), secondary attitude (Admiration/Support, Shady/Humor, Analytical, Annoyed, Hatred/Disgust, Sadness/Sympathy/Distress), emotional tone, and sarcasm are determined by LLM analysis using episode transcript context. The system provides:
+- **Primary Sentiment**: Classified as Positive, Neutral, or Negative using LLM contextual understanding
+- **Secondary Attitude**: Fine-grained emotional categorization (Admiration/Support, Shady/Humor, Analytical, Annoyed, Hatred/Disgust, Sadness/Sympathy/Distress)
+- **Emotion Extraction**: Specific emotions identified (joy, amusement, disgust, etc.)
+- **Sarcasm Detection**: Sarcasm score, label, and evidence extracted via LLM
+
+**Quantifiable Metrics**: Rule-based and computational metrics are derived algorithmically:
+- **Emoji Analysis**: Count and polarity of emojis in comments
+- **Media Detection**: GIF, image, video, and domain identification
+- **Engagement Metrics**: Upvotes, replies, velocity, awards, controversy index
+- **Text Patterns**: Hashtags, punctuation intensity, ALL-CAPS, negations, question marks
+- **Network Analysis**: Share of voice, co-mentions, cast interaction patterns
+
+#### Weighted Aggregation
+
+Each sentiment instance is multiplied by its comment's upvote weight (`upvotes_new`) before computing weekly per-cast and episode aggregates. This ensures that community consensus (as expressed through upvotes) drives the final sentiment scores, prioritizing highly-agreed-upon interpretations over individual outliers.
+
 **Differentiation**:
 - ✅ Vote-weighted sentiment (unique to Reddit community agreement)
 - ✅ Cast-level granularity (not just overall episode)

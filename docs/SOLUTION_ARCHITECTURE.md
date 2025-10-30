@@ -190,13 +190,37 @@ This document describes the complete solution architecture for the SOCIALIZER pl
                           │
 ┌─────────────────────────▼─────────────────────────────────────────────┐
 │                        PROCESSING LAYER                               │
+│                                                                        │
+│  Data Ingest → Pre-processing → LLM Sentiment Engine →                │
+│                                          ↓                             │
+│                                   Signal Extractor → Storage →         │
+│                                          ↓                             │
+│                                     Aggregation                        │
+│                                                                        │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  LLM Analysis Path (Semantic Interpretation)                   │  │
+│  │  • Primary Sentiment (Positive/Neutral/Negative)               │  │
+│  │  • Secondary Attitude (Admiration, Shady, Analytical, etc.)    │  │
+│  │  • Emotion Extraction (joy, amusement, disgust, etc.)          │  │
+│  │  • Sarcasm Detection (score, label, evidence)                  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  Computation Path (Rule-Based Metrics)                         │  │
+│  │  • Emoji count & polarity                                      │  │
+│  │  • GIF/image/video/domain detection                            │  │
+│  │  • Hashtags, punctuation, ALL-CAPS, negations, questions       │  │
+│  │  • Engagement metrics (upvotes, replies, velocity, awards)     │  │
+│  │  • Controversy index, share of voice, co-mentions              │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  Reddit          │  │  Entity          │  │  Sentiment       │  │
-│  │  Ingestion       │  │  Linking         │  │  Classification  │  │
+│  │  Reddit          │  │  Entity          │  │  Vote-Weighted   │  │
+│  │  Ingestion       │  │  Linking         │  │  Aggregation     │  │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  │
-│  │  Vote-Weighted   │  │  Time            │  │  Integrity       │  │
-│  │  Aggregation     │  │  Slicing         │  │  Detection       │  │
+│  │  Time            │  │  Integrity       │  │  Signal          │  │
+│  │  Slicing         │  │  Detection       │  │  Extraction      │  │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘  │
 └─────────────────────────┬─────────────────────────────────────────────┘
                           │

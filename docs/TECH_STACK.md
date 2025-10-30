@@ -29,6 +29,9 @@ This document details the complete technical stack, architecture decisions, and 
 - **Base Model**: RoBERTa-large (355M parameters)
 - **NLP**: spaCy 3.7+ with en_core_web_lg
 - **Training**: Weights & Biases for experiment tracking
+- **Lexical Processing**: emoji 2.8+, regex for pattern matching
+- **Network Analysis**: networkx 3.1+ for co-mention graphing
+- **Clustering**: scikit-learn 1.3+ for clustering and entropy calculations
 
 ### Infrastructure
 - **Cloud Provider**: AWS (primary) or Google Cloud Platform
@@ -1212,6 +1215,12 @@ def classify_comments_batch(comments: List[str], batch_size: int = 32):
 ### 8. Testing Stack
 
 ```python
+# Dependencies for LLM and Signal Extraction
+transformers==4.35.2
+emoji==2.8.0
+networkx==3.1.0
+scikit-learn==1.3.2
+
 # Dependencies
 pytest==7.4.3
 pytest-asyncio==0.21.1

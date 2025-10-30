@@ -63,6 +63,15 @@ This document summarizes the environment variables consumed by the SOCIALIZER pl
 - `THREAD_ARCHIVE_IDLE_MINUTES`: Minutes of inactivity before automatically archiving threads.
 - Thresholds: `SENTIMENT_THRESHOLD`, `SARCASM_THRESHOLD`, `TOXICITY_THRESHOLD`.
 
+### LLM Configuration (New)
+
+- `LLM_MODEL`: LLM model name or endpoint for sentiment/attitude/emotion/sarcasm analysis.
+- `LLM_ENDPOINT`: API endpoint URL for LLM inference service (if using external API).
+- `CONFIDENCE_THRESHOLD`: Minimum confidence score for LLM predictions (default 0.75).
+- `SARCASM_THRESHOLD`: Sarcasm probability threshold for labeling as sarcastic (default 0.5).
+- `WEIGHTING_MODE`: Mode for upvote weighting (`linear`, `logarithmic`, `sqrt`; default `linear`).
+- `WEIGHT_CAP`: Maximum upvote weight cap to prevent outlier dominance (default 200).
+
 ### Hugging Face & OpenAI Tokens
 
 - `HUGGINGFACE_ACCESS_TOKEN`, `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`: Access tokens forwarded to Hugging Face downloads (pipeline also honours `HF_TOKEN` for local CLI parity).
