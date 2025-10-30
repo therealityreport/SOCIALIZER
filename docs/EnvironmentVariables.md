@@ -72,6 +72,28 @@ This document summarizes the environment variables consumed by the SOCIALIZER pl
 - `WEIGHTING_MODE`: Mode for upvote weighting (`linear`, `logarithmic`, `sqrt`; default `linear`).
 - `WEIGHT_CAP`: Maximum upvote weight cap to prevent outlier dominance (default 200).
 
+### Multi-LLM Provider Configuration (Benchmarking)
+
+**OpenAI:**
+- `OPENAI_API_KEY`: OpenAI API key
+- `OPENAI_MODEL`: Model name (default `gpt-4o-mini`)
+- `OPENAI_ENDPOINT`: API endpoint (default `https://api.openai.com/v1/chat/completions`)
+
+**Anthropic:**
+- `ANTHROPIC_API_KEY`: Anthropic API key
+- `ANTHROPIC_MODEL`: Model name (default `claude-3-5-sonnet-20241022`)
+- `ANTHROPIC_ENDPOINT`: API endpoint (default `https://api.anthropic.com/v1/messages`)
+
+**Gemini:**
+- `GEMINI_API_KEY`: Google Gemini API key
+- `GEMINI_MODEL`: Model name (default `gemini-1.5-pro`)
+- `GEMINI_ENDPOINT`: API endpoint (default `https://generativelanguage.googleapis.com/v1beta/models`)
+
+**Control Settings:**
+- `LLM_PROVIDERS`: Comma-separated list of providers to use (default `openai`, options: `openai,anthropic,gemini`)
+- `LLM_EVAL_MODE`: Evaluation mode (default `parallel`, options: `parallel`, `sequential`)
+- `LLM_BENCHMARK_SAMPLES`: Fraction of comments to benchmark (default `0.25` for 25%, range 0.0-1.0)
+
 ### Hugging Face & OpenAI Tokens
 
 - `HUGGINGFACE_ACCESS_TOKEN`, `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`: Access tokens forwarded to Hugging Face downloads (pipeline also honours `HF_TOKEN` for local CLI parity).

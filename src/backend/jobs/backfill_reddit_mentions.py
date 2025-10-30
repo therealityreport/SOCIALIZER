@@ -25,8 +25,10 @@ from app.models.cast import CastMember
 from app.models.comment import Comment
 from app.models.mention import Mention, PrimarySentiment, SecondaryAttitude
 from app.models.thread import Thread
+from app.services.benchmark_evaluator import BenchmarkEvaluator
 from app.services.entity_linker import EntityLinker
 from app.services.llm_service import get_llm_service
+from app.services.llm_service_manager import get_llm_manager
 from app.services.signal_extractor import SignalExtractor
 
 logging.basicConfig(
@@ -47,6 +49,7 @@ class BackfillStats:
         self.llm_calls = 0
         self.llm_errors = 0
         self.cache_hits = 0
+        self.benchmark_calls = 0
         self.start_time = datetime.now()
         self.thread_durations: dict[int, float] = {}
 
@@ -61,6 +64,7 @@ class BackfillStats:
             "llm_calls": self.llm_calls,
             "llm_errors": self.llm_errors,
             "cache_hits": self.cache_hits,
+            "benchmark_calls": self.benchmark_calls,
             "total_duration_seconds": elapsed,
             "avg_duration_per_thread": elapsed / max(1, self.threads_processed),
             "thread_durations": self.thread_durations,
@@ -75,6 +79,9 @@ class BackfillJob:
         dry_run: bool = False,
         thread_id: Optional[int] = None,
         batch_size: int = 100,
+        benchmark_mode: bool = False,
+        llm_providers: Optional[list[str]] = None,
+        sample_rate: float = 0.25,
     ):
         """
         Initialize backfill job
@@ -83,18 +90,32 @@ class BackfillJob:
             dry_run: If True, don't write to database
             thread_id: Optional specific thread to process
             batch_size: Number of comments to process at once
+            benchmark_mode: If True, test all providers and store comparisons
+            llm_providers: List of providers to use in benchmark mode
+            sample_rate: Fraction of comments to benchmark (0.0-1.0)
         """
         self.dry_run = dry_run
         self.thread_id = thread_id
         self.batch_size = batch_size
+        self.benchmark_mode = benchmark_mode
+        self.sample_rate = sample_rate
 
         self.stats = BackfillStats()
         self.llm_service = get_llm_service()
         self.signal_extractor = SignalExtractor()
         self.entity_linker = EntityLinker()
 
+        # Multi-provider support for benchmarking
+        if benchmark_mode:
+            self.llm_manager = get_llm_manager(llm_providers)
+            self.benchmark_evaluator = BenchmarkEvaluator()
+        else:
+            self.llm_manager = None
+            self.benchmark_evaluator = None
+
         # QA data collection
         self.qa_data: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        self.benchmark_data: dict[int, list[dict[str, Any]]] = defaultdict(list)
 
     async def run(self, session: AsyncSession) -> dict[str, Any]:
         """
@@ -241,14 +262,70 @@ class BackfillJob:
         }
         signals = self.signal_extractor.extract(comment.body, comment_data)
 
-        # Step 3: LLM analysis
-        try:
-            llm_result = await self.llm_service.analyze(comment.body, context)
-            self.stats.llm_calls += 1
-        except Exception as e:
-            logger.error(f"LLM analysis failed for comment {comment.id}: {e}")
-            self.stats.llm_errors += 1
-            return
+        # Step 3: LLM analysis (benchmark mode or standard)
+        import random
+
+        # Determine if this comment should be benchmarked
+        should_benchmark = (
+            self.benchmark_mode and
+            random.random() < self.sample_rate
+        )
+
+        llm_result = None
+        provider_results = None
+        provider_preferred = None
+
+        if should_benchmark and self.llm_manager:
+            # Multi-provider benchmark analysis
+            try:
+                provider_results = await self.llm_manager.analyze_with_all(comment.body, context)
+                self.stats.benchmark_calls += 1
+
+                # Calculate agreement score
+                agreement_score = self.llm_manager.calculate_agreement_score(provider_results)
+
+                # Select preferred provider
+                provider_preferred, llm_result = self.llm_manager.select_preferred_provider(provider_results)
+
+                # Store benchmark data
+                for provider, result in provider_results.items():
+                    self.benchmark_evaluator.add_result(
+                        provider,
+                        result,
+                        agreement_score,
+                    )
+
+                # Collect benchmark comparison data
+                benchmark_row = {
+                    "comment_id": comment.id,
+                    "cast_member": cast_ids[0] if cast_ids else None,
+                    "text": comment.body[:200],
+                }
+                for provider, result in provider_results.items():
+                    benchmark_row[f"{provider}_sentiment"] = result.primary_sentiment
+                    benchmark_row[f"{provider}_confidence"] = result.confidence
+                    benchmark_row[f"{provider}_sarcasm"] = result.sarcasm_score
+
+                benchmark_row["agreement_score"] = agreement_score
+                benchmark_row["best_provider"] = provider_preferred
+
+                self.benchmark_data[thread.id].append(benchmark_row)
+
+            except Exception as e:
+                logger.error(f"Benchmark analysis failed for comment {comment.id}: {e}")
+                self.stats.llm_errors += 1
+                # Fall back to standard analysis
+                should_benchmark = False
+
+        if not should_benchmark:
+            # Standard single-provider analysis
+            try:
+                llm_result = await self.llm_service.analyze(comment.body, context)
+                self.stats.llm_calls += 1
+            except Exception as e:
+                logger.error(f"LLM analysis failed for comment {comment.id}: {e}")
+                self.stats.llm_errors += 1
+                return
 
         # Step 4: Create or update mentions
         for cast_id in cast_ids:
@@ -259,6 +336,8 @@ class BackfillJob:
                 llm_result,
                 signals,
                 thread,
+                provider_results,
+                provider_preferred,
             )
 
     async def _upsert_mention(
@@ -269,6 +348,8 @@ class BackfillJob:
         llm_result: Any,
         signals: Any,
         thread: Thread,
+        provider_results: Optional[dict] = None,
+        provider_preferred: Optional[str] = None,
     ) -> None:
         """Create or update a mention with idempotency"""
         # Build mention data
@@ -294,6 +375,9 @@ class BackfillJob:
             "weight": self._calculate_weight(signals, llm_result),
             "is_sarcastic": llm_result.sarcasm_score >= 0.5,
             "is_toxic": False,  # TODO: Add toxicity from LLM
+            # Multi-provider benchmark fields
+            "llm_results": self._normalize_provider_results(provider_results) if provider_results else None,
+            "provider_preferred": provider_preferred,
         }
 
         if not self.dry_run:
@@ -337,6 +421,25 @@ class BackfillJob:
         weight = max(1, upvotes) * llm_result.confidence
         return weight
 
+    def _normalize_provider_results(self, provider_results: dict) -> dict[str, Any]:
+        """Normalize provider results for JSONB storage"""
+        if not provider_results:
+            return {}
+
+        normalized = {}
+        for provider, result in provider_results.items():
+            normalized[provider] = {
+                "primary_sentiment": result.primary_sentiment,
+                "secondary_attitude": result.secondary_attitude,
+                "emotions": result.emotions,
+                "sarcasm_score": result.sarcasm_score,
+                "confidence": result.confidence,
+                "execution_time": result.execution_time,
+                "token_count": result.token_count,
+                "cost_estimate": result.cost_estimate,
+            }
+        return normalized
+
     def _generate_qa_files(self) -> None:
         """Generate QA CSV files for top weighted mentions per thread"""
         qa_dir = Path("qa_reports")
@@ -357,6 +460,22 @@ class BackfillJob:
 
             logger.info(f"Generated QA report: {csv_path}")
 
+        # Generate benchmark reports if in benchmark mode
+        if self.benchmark_mode and self.benchmark_evaluator:
+            # Per-thread benchmark CSVs
+            for thread_id, benchmark_rows in self.benchmark_data.items():
+                if benchmark_rows:
+                    self.benchmark_evaluator.generate_detail_report(
+                        qa_dir / f"benchmark_llm_thread_{thread_id}.csv",
+                        benchmark_rows,
+                    )
+
+            # Global summary
+            self.benchmark_evaluator.generate_summary_report(
+                qa_dir / "benchmark_summary.csv"
+            )
+            self.benchmark_evaluator.print_summary()
+
     def _print_report(self, report: dict[str, Any]) -> None:
         """Print final report"""
         print("\n" + "=" * 80)
@@ -369,6 +488,7 @@ class BackfillJob:
         print(f"LLM calls:            {report['llm_calls']}")
         print(f"LLM errors:           {report['llm_errors']}")
         print(f"Cache hits:           {report['cache_hits']}")
+        print(f"Benchmark calls:      {report['benchmark_calls']}")
         print(f"Total duration:       {report['total_duration_seconds']:.2f}s")
         print(f"Avg per thread:       {report['avg_duration_per_thread']:.2f}s")
         print("=" * 80)
@@ -382,12 +502,23 @@ async def main():
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no database writes)")
     parser.add_argument("--thread-id", type=int, help="Process specific thread ID only")
     parser.add_argument("--batch-size", type=int, default=100, help="Batch size for processing")
+    parser.add_argument("--benchmark-mode", action="store_true", help="Enable multi-provider benchmarking")
+    parser.add_argument("--llm-providers", type=str, help="Comma-separated list of providers (openai,anthropic,gemini)")
+    parser.add_argument("--sample-rate", type=float, default=0.25, help="Fraction of comments to benchmark (0.0-1.0)")
     args = parser.parse_args()
+
+    # Parse providers list
+    providers = None
+    if args.llm_providers:
+        providers = [p.strip() for p in args.llm_providers.split(",")]
 
     job = BackfillJob(
         dry_run=args.dry_run,
         thread_id=args.thread_id,
         batch_size=args.batch_size,
+        benchmark_mode=args.benchmark_mode,
+        llm_providers=providers,
+        sample_rate=args.sample_rate,
     )
 
     async for session in get_async_session():

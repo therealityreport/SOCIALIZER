@@ -85,6 +85,10 @@ class Mention(TimestampMixin, Base):
     spans: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
     needs_recompute: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Multi-LLM provider benchmarking fields
+    llm_results: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    provider_preferred: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
     comment: Mapped["Comment"] = relationship(back_populates="mentions", lazy="joined")
     cast_member: Mapped["CastMember"] = relationship(back_populates="mentions", lazy="joined")
 
