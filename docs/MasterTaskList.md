@@ -424,6 +424,61 @@ This document provides a complete, prioritized task list for building the SOCIAL
   - **Priority**: P0
   - **Estimate**: 16 hours
 
+### Backend - LLM Provider Automation (Phase 2)
+- [ ] **BE-LLM-005**: Automated Provider Selection
+  - Create scheduled job `jobs/select_best_llm.py`
+  - Runs nightly; reads latest `qa_reports/benchmark_summary.csv`
+  - Chooses provider with highest composite score (provider_score ≥ 0.85 × max)
+  - Updates `config/active_provider.json` and ENV var `PROVIDER_PREFERRED`
+  - Logs historical provider changes
+  - **Assignee**: Backend Engineer
+  - **Priority**: P1
+  - **Estimate**: 12 hours
+
+- [ ] **BE-LLM-006**: Episode Integration
+  - Modify `backfill_reddit_mentions.py` and future social pipelines to read `PROVIDER_PREFERRED`
+  - Ensure all new analysis jobs automatically route to that LLM
+  - Fallback to second-best if primary fails > 5%
+  - **Assignee**: Backend Engineer
+  - **Priority**: P1
+  - **Estimate**: 10 hours
+
+- [ ] **BE-LLM-007**: Dashboard Enhancements
+  - Add "LLM Performance" panel to analytics UI
+  - Metrics: mean confidence, latency, cost/1K comments, sarcasm accuracy, sentiment agreement
+  - Time-series per provider
+  - Add cast-level scatter: sarcasm accuracy vs sentiment divergence
+  - **Assignee**: Frontend Engineer + Backend Engineer
+  - **Priority**: P2
+  - **Estimate**: 16 hours
+
+- [ ] **BE-LLM-008**: QA Drift Automation
+  - Weekly sample 5% of comments analyzed by `provider_preferred`
+  - Re-run with secondary provider to compare agreement %
+  - Flag when agreement < 0.8
+  - Output `qa_reports/drift_summary.csv`
+  - **Assignee**: Backend Engineer
+  - **Priority**: P1
+  - **Estimate**: 14 hours
+
+- [ ] **BE-LLM-009**: Cost Monitor & Alerts
+  - Extend BenchmarkEvaluator to log total tokens × price per provider
+  - Store in `provider_costs` table
+  - Email/Slack alert when spend > monthly limit (COST_ALERT_THRESHOLD = $500 default)
+  - **Assignee**: Backend Engineer
+  - **Priority**: P1
+  - **Estimate**: 8 hours
+
+### Documentation - LLM Provider System
+- [ ] **DOCS-LLM-001**: Documentation & Diagram Updates
+  - Add `/docs/LLM_BENCHMARKS.md` summarizing provider evaluation loop
+  - Document auto-selection logic, re-benchmark cadence, cost monitoring, drift QA rules
+  - In SOLUTION_ARCHITECTURE.md, insert Provider Evaluation Loop node
+  - Update README.md and MasterTaskList.md index links
+  - **Assignee**: Technical Writer + ML Engineer
+  - **Priority**: P1
+  - **Estimate**: 6 hours
+
 ### Backend - Analytics Engine
 - [x] **BE-MVP-012**: Implement vote-weighted sentiment aggregation
   - Create aggregation function with vote weighting formula

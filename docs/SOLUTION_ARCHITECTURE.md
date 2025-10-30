@@ -198,11 +198,23 @@ This document describes the complete solution architecture for the SOCIALIZER pl
 │                                     Aggregation                        │
 │                                                                        │
 │  ┌────────────────────────────────────────────────────────────────┐  │
+│  │  Provider Evaluation Loop (Automated)                          │  │
+│  │                                                                 │  │
+│  │  Benchmark → Provider Selection → Active Provider →            │  │
+│  │      ↑              ↓                      ↓                    │  │
+│  │      │         Config Update          Production               │  │
+│  │      │              ↓                      ↓                    │  │
+│  │      └─────── Drift QA Monitor ←─────────┘                     │  │
+│  │              (Weekly Check)                                     │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌────────────────────────────────────────────────────────────────┐  │
 │  │  LLM Analysis Path (Semantic Interpretation)                   │  │
 │  │  • Primary Sentiment (Positive/Neutral/Negative)               │  │
 │  │  • Secondary Attitude (Admiration, Shady, Analytical, etc.)    │  │
 │  │  • Emotion Extraction (joy, amusement, disgust, etc.)          │  │
 │  │  • Sarcasm Detection (score, label, evidence)                  │  │
+│  │  • Provider: OpenAI | Anthropic | Gemini (auto-selected)       │  │
 │  └────────────────────────────────────────────────────────────────┘  │
 │                                                                        │
 │  ┌────────────────────────────────────────────────────────────────┐  │

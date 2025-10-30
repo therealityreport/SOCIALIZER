@@ -94,6 +94,25 @@ This document summarizes the environment variables consumed by the SOCIALIZER pl
 - `LLM_EVAL_MODE`: Evaluation mode (default `parallel`, options: `parallel`, `sequential`)
 - `LLM_BENCHMARK_SAMPLES`: Fraction of comments to benchmark (default `0.25` for 25%, range 0.0-1.0)
 
+### LLM Provider Automation (Phase 2)
+
+**Active Provider:**
+- `PROVIDER_PREFERRED`: Currently selected provider (set by automation, default `openai`)
+
+**Automation Schedules:**
+- `BENCHMARK_CRON_SCHEDULE`: Cron schedule for quarterly benchmarking (default `0 3 1 */3 *` - first day of quarter at 3 AM)
+- `DRIFT_CHECK_SCHEDULE`: Cron schedule for drift monitoring (default `0 0 * * 0` - Sunday midnight)
+- `PROVIDER_SELECT_SCHEDULE`: Cron schedule for automated provider selection (default `0 3 * * *` - daily 3 AM)
+
+**Drift Detection:**
+- `DRIFT_SAMPLE_RATE`: Fraction of comments to re-analyze for drift detection (default `0.05` for 5%)
+- `DRIFT_AGREEMENT_THRESHOLD`: Agreement threshold for drift alerts (default `0.8`)
+
+**Cost Controls:**
+- `COST_ALERT_THRESHOLD`: Monthly cost limit in USD before alerting (default `500`)
+- `ALERT_EMAIL`: Email address for cost and drift alerts
+- `SLACK_WEBHOOK_URL`: Slack webhook for alerts (optional)
+
 ### Hugging Face & OpenAI Tokens
 
 - `HUGGINGFACE_ACCESS_TOKEN`, `HF_TOKEN`, `HUGGINGFACE_HUB_TOKEN`: Access tokens forwarded to Hugging Face downloads (pipeline also honours `HF_TOKEN` for local CLI parity).
