@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from .routes import alerts, analytics, cast, exports, health, integrity, llm, threads
+from .routes import alerts, analytics, cast, episode_discussions, exports, health, integrity, llm, threads
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(exports.router)
 api_router.include_router(alerts.router)
 api_router.include_router(integrity.router)
 api_router.include_router(llm.router, prefix="/llm", tags=["llm"])
+api_router.include_router(episode_discussions.router)
