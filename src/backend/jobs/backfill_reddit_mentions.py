@@ -29,6 +29,7 @@ from app.services.benchmark_evaluator import BenchmarkEvaluator
 from app.services.entity_linker import EntityLinker
 from app.services.llm_service import get_llm_service
 from app.services.llm_service_manager import get_llm_manager
+from app.services.provider_selection import get_active_provider, get_fallback_provider
 from app.services.signal_extractor import SignalExtractor
 
 logging.basicConfig(
@@ -101,7 +102,6 @@ class BackfillJob:
         self.sample_rate = sample_rate
 
         self.stats = BackfillStats()
-        self.llm_service = get_llm_service()
         self.signal_extractor = SignalExtractor()
         self.entity_linker = EntityLinker()
 
@@ -109,9 +109,27 @@ class BackfillJob:
         if benchmark_mode:
             self.llm_manager = get_llm_manager(llm_providers)
             self.benchmark_evaluator = BenchmarkEvaluator()
+            self.use_single_provider = False
         else:
-            self.llm_manager = None
+            # Production mode: Use active provider from nightly selection
+            active_provider = get_active_provider()
+            fallback_provider = get_fallback_provider()
+
+            # Create manager with active + fallback providers
+            providers = [active_provider]
+            if fallback_provider and fallback_provider != active_provider:
+                providers.append(fallback_provider)
+
+            self.llm_manager = get_llm_manager(providers)
             self.benchmark_evaluator = None
+            self.use_single_provider = True
+
+            logger.info(f"Using active provider: {active_provider}")
+            if fallback_provider:
+                logger.info(f"Fallback provider: {fallback_provider}")
+
+        # Legacy single-provider service (kept for backward compatibility)
+        self.llm_service = get_llm_service()
 
         # QA data collection
         self.qa_data: dict[int, list[dict[str, Any]]] = defaultdict(list)
@@ -141,8 +159,8 @@ class BackfillJob:
         for thread in threads:
             await self._process_thread(session, thread)
 
-        # Generate QA CSV files
-        self._generate_qa_files()
+        # Generate QA CSV files and log costs
+        await self._generate_qa_files(session)
 
         # Generate final report
         report = self.stats.report()
@@ -318,9 +336,19 @@ class BackfillJob:
                 should_benchmark = False
 
         if not should_benchmark:
-            # Standard single-provider analysis
+            # Standard analysis using active provider (with fallback)
             try:
-                llm_result = await self.llm_service.analyze(comment.body, context)
+                if self.use_single_provider and self.llm_manager:
+                    # Production mode: Use active provider with automatic fallback
+                    provider_results = await self.llm_manager.analyze_with_all(comment.body, context)
+
+                    # Select best result from available providers (primary or fallback)
+                    provider_preferred, llm_result = self.llm_manager.select_preferred_provider(provider_results)
+                else:
+                    # Legacy mode: Use single LLM service
+                    llm_result = await self.llm_service.analyze(comment.body, context)
+                    provider_preferred = None
+
                 self.stats.llm_calls += 1
             except Exception as e:
                 logger.error(f"LLM analysis failed for comment {comment.id}: {e}")
@@ -440,7 +468,7 @@ class BackfillJob:
             }
         return normalized
 
-    def _generate_qa_files(self) -> None:
+    async def _generate_qa_files(self, session: AsyncSession) -> None:
         """Generate QA CSV files for top weighted mentions per thread"""
         qa_dir = Path("qa_reports")
         qa_dir.mkdir(exist_ok=True)
@@ -475,6 +503,11 @@ class BackfillJob:
                 qa_dir / "benchmark_summary.csv"
             )
             self.benchmark_evaluator.print_summary()
+
+            # Log costs to database
+            if not self.dry_run:
+                await self.benchmark_evaluator.log_costs_to_database(session)
+                logger.info("Logged benchmark costs to provider_costs table")
 
     def _print_report(self, report: dict[str, Any]) -> None:
         """Print final report"""
