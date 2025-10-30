@@ -11,10 +11,14 @@ import csv
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.llm_providers import LLMAnalysisResult
+from app.services.cost_monitor import get_cost_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -262,3 +266,37 @@ class BenchmarkEvaluator:
 
         best = max(metrics.values(), key=lambda m: m.provider_score)
         return best.provider
+
+    async def log_costs_to_database(
+        self,
+        session: AsyncSession,
+        date: Optional[datetime] = None,
+    ) -> None:
+        """
+        Log provider costs to database for tracking and alerting
+
+        Args:
+            session: Database session
+            date: Date to log costs for (defaults to today)
+        """
+        if date is None:
+            date = datetime.utcnow()
+
+        metrics = self.calculate_metrics()
+        if not metrics:
+            logger.warning("No metrics to log to database")
+            return
+
+        cost_monitor = get_cost_monitor()
+
+        for provider, metric in metrics.items():
+            await cost_monitor.log_daily_cost(
+                session=session,
+                provider=provider,
+                date=date,
+                tokens_consumed=metric.total_tokens,
+                cost_usd=metric.total_cost,
+                comments_analyzed=metric.call_count,
+            )
+
+        logger.info(f"Logged costs for {len(metrics)} providers to database")
