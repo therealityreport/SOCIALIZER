@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 from app.api import deps
 from app.db.base import Base
 from app.main import app
-from app.models import Aggregate, CastAlias, CastMember, Export, Thread
+from app.models import Aggregate, CastAlias, CastMember, Comment, Export, Mention, Thread
 from app.tasks import ingestion as ingestion_tasks
 from app.api.routes import threads as thread_routes
 from celery.app import task as celery_task
@@ -61,6 +61,26 @@ def test_client() -> tuple[TestClient, sessionmaker[Session]]:
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 PRIMARY KEY (id, created_at)
+            )
+            """
+        )
+        conn.exec_driver_sql(
+            """
+            CREATE TABLE IF NOT EXISTS mentions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                comment_id INTEGER NOT NULL,
+                comment_created_at TEXT NOT NULL,
+                cast_member_id INTEGER NOT NULL,
+                sentiment_label TEXT NOT NULL,
+                sentiment_score REAL,
+                confidence REAL,
+                is_sarcastic BOOLEAN DEFAULT 0,
+                is_toxic BOOLEAN DEFAULT 0,
+                weight REAL,
+                method TEXT,
+                quote TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
@@ -117,10 +137,13 @@ def test_full_thread_workflow(test_client: tuple[TestClient, sessionmaker[Sessio
     thread_id = thread['id']
     assert scheduled["fetch"] == (create_payload["reddit_id"], create_payload["subreddit"])
 
+    cast_id = None
+
     with SessionLocal() as db:
         cast = CastMember(slug='jane-doe', full_name='Jane Doe', show='Bravo Show')
         db.add(cast)
         db.flush()
+        cast_id = cast.id
 
         aggregates = [
             Aggregate(
@@ -176,3 +199,60 @@ def test_full_thread_workflow(test_client: tuple[TestClient, sessionmaker[Sessio
     assert download_response.status_code == 200
     assert download_response.headers['content-type'].startswith('text/csv')
     assert 'cast_slug' in download_response.text
+
+    comment_timestamp = dt.datetime(2024, 1, 1, 2, tzinfo=dt.timezone.utc)
+    with SessionLocal() as db:
+        comment = Comment(
+            id=1,
+            thread_id=thread_id,
+            reddit_id='cmt123',
+            author_hash='hash-xyz',
+            body='Loved this episode, especially Jane!',
+            created_utc=comment_timestamp,
+            score=12,
+            reply_count=3,
+            time_window='live',
+            sentiment_label='positive',
+            sentiment_score=0.92,
+            sentiment_breakdown={
+                'models': [
+                    {
+                        'name': 'ml-primary',
+                        'sentiment_label': 'positive',
+                        'sentiment_score': 0.92,
+                        'reasoning': 'High praise detected.',
+                    }
+                ],
+                'combined_score': 0.92,
+                'final_label': 'positive',
+                'final_source': 'ml-primary',
+            },
+            is_sarcastic=False,
+            sarcasm_confidence=None,
+            is_toxic=False,
+            toxicity_confidence=None,
+        )
+        comment.created_at = comment_timestamp
+        comment.updated_at = comment_timestamp
+        db.add(comment)
+        db.flush()
+
+        if cast_id is not None:
+            mention = Mention(
+                comment_id=comment.id,
+                comment_created_at=comment.created_at,
+                cast_member_id=cast_id,
+                sentiment_label='positive',
+                sentiment_score=0.88,
+                quote='Jane stole the episode.',
+            )
+            db.add(mention)
+        db.commit()
+
+    comments_export = client.get(f'/api/v1/threads/{thread_id}/comments/export')
+    assert comments_export.status_code == 200
+    assert comments_export.headers['content-type'].startswith('text/csv')
+    csv_payload = comments_export.text
+    assert 'comment_id' in csv_payload
+    assert 'Loved this episode' in csv_payload
+    assert 'Jane Doe' in csv_payload

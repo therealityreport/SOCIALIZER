@@ -6,6 +6,7 @@ from typing import Dict, Sequence
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -15,6 +16,7 @@ from app.models import CastMember, Comment, Mention, Thread
 from app.schemas.analytics import ThreadInsightsResponse
 from app.schemas.comment import CommentListResponse, CommentMentionRead, CommentRead
 from app.schemas.thread import ThreadCreate, ThreadLookupResponse, ThreadRead, ThreadUpdate
+from app.services import comment_exporter
 from app.services.discussion_insights import generate_thread_insights
 from app.tasks.analytics import compute_aggregates
 from app.tasks.ingestion import fetch_thread, poll_thread
@@ -246,6 +248,19 @@ def list_thread_comments(
     ]
 
     return CommentListResponse(comments=payload, total=total, limit=limit, offset=offset)
+
+
+@router.get("/{thread_id}/comments/export")
+def export_thread_comments(thread_id: int, db: Session = Depends(deps.get_db)) -> StreamingResponse:
+    thread = db.get(Thread, thread_id)
+    if not thread:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found.")
+    filename, content = comment_exporter.generate_thread_comments_csv(db, thread)
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{thread_id}/insights", response_model=ThreadInsightsResponse)

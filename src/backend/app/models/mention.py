@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import TYPE_CHECKING, Optional
+import enum
+from typing import TYPE_CHECKING, Any, Optional
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    Enum,
     Float,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
+    JSON,
     String,
     Text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -23,6 +27,21 @@ from app.models.base import TimestampMixin
 if TYPE_CHECKING:
     from app.models.cast import CastMember
     from app.models.comment import Comment
+
+
+class PrimarySentiment(str, enum.Enum):
+    POSITIVE = "POSITIVE"
+    NEUTRAL = "NEUTRAL"
+    NEGATIVE = "NEGATIVE"
+
+
+class SecondaryAttitude(str, enum.Enum):
+    ADMIRATION_SUPPORT = "Admiration/Support"
+    SHADY_HUMOR = "Shady/Humor"
+    ANALYTICAL = "Analytical"
+    ANNOYED = "Annoyed"
+    HATRED_DISGUST = "Hatred/Disgust"
+    SADNESS_SYMPATHY = "Sadness/Sympathy/Distress"
 
 
 class Mention(TimestampMixin, Base):
@@ -51,6 +70,20 @@ class Mention(TimestampMixin, Base):
     weight: Mapped[Optional[float]] = mapped_column(Float)
     method: Mapped[Optional[str]] = mapped_column(String(32))
     quote: Mapped[Optional[str]] = mapped_column(Text)
+
+    # New LLM-driven fields
+    primary_sentiment: Mapped[Optional[PrimarySentiment]] = mapped_column(Enum(PrimarySentiment), nullable=True)
+    secondary_attitude: Mapped[Optional[SecondaryAttitude]] = mapped_column(Enum(SecondaryAttitude), nullable=True)
+    emotions: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    sarcasm_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sarcasm_label: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    sarcasm_evidence: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Computed signal fields
+    signals: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    engagement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    spans: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB().with_variant(JSON(), "sqlite"), nullable=True)
+    needs_recompute: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     comment: Mapped["Comment"] = relationship(back_populates="mentions", lazy="joined")
     cast_member: Mapped["CastMember"] = relationship(back_populates="mentions", lazy="joined")

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Download, FileJson, FileText } from 'lucide-react';
 
 import { useCreateExport, useDownloadExport, type ExportHistoryEntry } from '../../hooks/useExports';
+import { triggerFileDownload } from '../../lib/utils';
 import { Alert } from '../ui/alert';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -32,7 +33,7 @@ export function ExportPanel({ threadId }: ExportPanelProps) {
     try {
       const exportMeta = await createExportMutation.mutateAsync({ threadId, format });
       const file = await downloadExportMutation.mutateAsync({ exportId: exportMeta.id });
-      triggerDownload(file.blob, file.filename);
+      triggerFileDownload(file.blob, file.filename);
       setHistory((current) => [{ ...exportMeta, downloadedAt: new Date().toISOString() }, ...current].slice(0, 5));
       setIsMenuOpen(false);
     } catch (err) {
@@ -102,17 +103,6 @@ export function ExportPanel({ threadId }: ExportPanelProps) {
       </CardContent>
     </Card>
   );
-}
-
-function triggerDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
 }
 
 function BadgeForFormat({ format }: { format: 'csv' | 'json' }) {

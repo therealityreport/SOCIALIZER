@@ -1,3 +1,5 @@
+import { Download } from 'lucide-react';
+
 import type { CastAnalytics, CommentListResponse, CommentMention, ThreadComment } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
 import { Alert } from '../ui/alert';
@@ -24,6 +26,9 @@ type CommentFeedProps = {
   includeUnassignedOption?: boolean;
   emptyMessage?: string;
   filteredEmptyMessage?: string;
+  onExport?: () => void;
+  isExporting?: boolean;
+  exportError?: string | null;
 };
 
 export function CommentFeed({
@@ -43,7 +48,10 @@ export function CommentFeed({
   sortOptions = defaultSortOptions,
   includeUnassignedOption = false,
   emptyMessage = 'No comments have been ingested yet.',
-  filteredEmptyMessage = 'No comments matched this filter.'
+  filteredEmptyMessage = 'No comments matched this filter.',
+  onExport,
+  isExporting = false,
+  exportError
 }: CommentFeedProps) {
   const total = response?.total ?? 0;
   const comments = response?.comments ?? [];
@@ -53,6 +61,7 @@ export function CommentFeed({
   const hasNext = response ? response.offset + pageSize < total : false;
   const showFilter = Array.isArray(castOptions) && castOptions.length > 0 && typeof onCastChange === 'function';
   const showSort = typeof onSortChange === 'function';
+  const canExport = typeof onExport === 'function';
 
   return (
     <Card>
@@ -102,10 +111,35 @@ export function CommentFeed({
               </select>
             </div>
           ) : null}
+          {canExport ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                onExport?.();
+              }}
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <>
+                  <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/40 border-t-transparent" />
+                  Preparing…
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  Download CSV
+                </>
+              )}
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? <Alert variant="error">{error}</Alert> : null}
+        {exportError ? <Alert variant="error">{exportError}</Alert> : null}
         {isLoading ? (
           <Spinner label="Loading comments..." className="py-8" />
         ) : comments.length ? (

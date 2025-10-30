@@ -21,6 +21,7 @@ class MentionAggregateInput:
     sentiment_label: SentimentLabel | None
     comment_score: int | None
     time_window: TimeWindow | None
+    weight: float | None = None  # New: pre-calculated weight (upvotes * confidence)
 
 
 @dataclass
@@ -61,12 +62,16 @@ class _AggregationAccumulator:
         self._counts: dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
         self._weight_sum: float = 0.0
 
-    def add(self, label: SentimentLabel | None, score: int | None) -> None:
+    def add(self, label: SentimentLabel | None, score: int | None, weight: float | None = None) -> None:
         normalized = _normalize_label(label)
-        weight = float(max(score or 0, 0) + 1)
+        # Use pre-calculated weight if available, otherwise fall back to score-based weighting
+        if weight is not None:
+            calculated_weight = weight
+        else:
+            calculated_weight = float(max(score or 0, 0) + 1)
         self._counts[normalized] += 1
-        self._weighted[normalized] += weight
-        self._weight_sum += weight
+        self._weighted[normalized] += calculated_weight
+        self._weight_sum += calculated_weight
 
     def finalize(self) -> AggregatedMetrics | None:
         total_count = sum(self._counts.values())
@@ -125,9 +130,9 @@ class AggregationCalculator:
             window = _normalize_window(mention.time_window)
             acc_key = (cast_id, window)
 
-            cast_window_acc[acc_key].add(mention.sentiment_label, mention.comment_score)
-            cast_overall_acc[cast_id].add(mention.sentiment_label, mention.comment_score)
-            window_acc[window].add(mention.sentiment_label, mention.comment_score)
+            cast_window_acc[acc_key].add(mention.sentiment_label, mention.comment_score, mention.weight)
+            cast_overall_acc[cast_id].add(mention.sentiment_label, mention.comment_score, mention.weight)
+            window_acc[window].add(mention.sentiment_label, mention.comment_score, mention.weight)
 
         cast_results: dict[int, CastAggregation] = {}
         finalized_overall: dict[int, AggregatedMetrics] = {}
@@ -201,6 +206,7 @@ class AggregationService:
                 Mention.sentiment_label,
                 Comment.score,
                 Comment.time_window,
+                Mention.weight,
             )
             .join(
                 Comment,
@@ -220,6 +226,7 @@ class AggregationService:
                 sentiment_label=row.sentiment_label,
                 comment_score=row.score,
                 time_window=row.time_window,
+                weight=row.weight,
             )
             for row in rows
             if row.cast_member_id is not None

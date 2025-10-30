@@ -3,11 +3,12 @@ import { useParams } from 'react-router-dom';
 
 import { Gauge, MessageSquare, Users2, RefreshCcw } from 'lucide-react';
 
-import { useThread, useThreadComments, useThreadInsights, useReanalyzeThread } from '../hooks/useThreads';
+import { useThread, useThreadComments, useThreadInsights, useReanalyzeThread, useThreadCommentsExport } from '../hooks/useThreads';
 import type { CastAnalytics } from '../lib/api/types';
 import { useThreadCastAnalytics } from '../hooks/useAnalytics';
 import { useAlertHistory } from '../hooks/useAlerts';
 import { useCastRosterMutations } from '../hooks/useCastRoster';
+import { triggerFileDownload } from '../lib/utils';
 import { Alert } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -76,10 +77,12 @@ export default function ThreadDetail() {
     refetch: refreshInsights
   } = useThreadInsights(Number.isNaN(threadId) ? undefined : threadId);
   const reanalyzeMutation = useReanalyzeThread(Number.isNaN(threadId) ? undefined : threadId);
+  const commentExportMutation = useThreadCommentsExport(Number.isNaN(threadId) ? undefined : threadId);
   const { createMutation: createCastMutation } = useCastRosterMutations();
   const [pendingCastName, setPendingCastName] = useState<string | null>(null);
   const [castError, setCastError] = useState<string | null>(null);
   const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [commentExportError, setCommentExportError] = useState<string | null>(null);
 
   const isLoading = isThreadLoading || isAnalyticsLoading || isHistoryLoading || (isInsightsLoading && !insights);
   const isRefreshing =
@@ -143,6 +146,19 @@ export default function ThreadDetail() {
       await Promise.allSettled([refreshAnalytics(), refreshInsights()]);
     } catch (error) {
       setCastError(error instanceof Error ? error.message : 'Failed to add cast member.');
+    }
+  };
+
+  const handleDownloadComments = async () => {
+    if (Number.isNaN(threadId)) {
+      return;
+    }
+    setCommentExportError(null);
+    try {
+      const file = await commentExportMutation.mutateAsync();
+      triggerFileDownload(file.blob, file.filename);
+    } catch (error) {
+      setCommentExportError(error instanceof Error ? error.message : 'Failed to download comments.');
     }
   };
 
@@ -257,22 +273,30 @@ export default function ThreadDetail() {
         isLoading={isCommentsLoading}
         error={isCommentsError ? commentsError?.message ?? 'Unable to load comments.' : null}
         page={commentPage}
-        onPageChange={setCommentPage}
+        onPageChange={(value) => {
+          setCommentPage(value);
+          setCommentExportError(null);
+        }}
         pageSize={COMMENTS_PAGE_SIZE}
         castOptions={sortedCast}
         selectedCast={selectedCast}
         onCastChange={(value) => {
+          setCommentExportError(null);
           setSelectedCast(value);
           setCommentPage(0);
         }}
         sort={selectedSort}
         onSortChange={(value) => {
+          setCommentExportError(null);
           setSelectedSort(value);
           setCommentPage(0);
         }}
         includeUnassignedOption
         filteredEmptyMessage={selectedCast === 'unassigned' ? 'No unassigned comments yet.' : 'No comments matched this cast filter.'}
         description="Inspect individual Reddit comments or narrow the feed to a specific cast member."
+        onExport={handleDownloadComments}
+        isExporting={commentExportMutation.isPending}
+        exportError={commentExportError}
       />
 
       <ExportPanel threadId={thread.id} />

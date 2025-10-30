@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   createThread,
+  downloadThreadCommentsCsv,
   getThread,
   getThreadComments,
   getThreadInsights,
@@ -155,5 +156,19 @@ export function useThreadLookup(url: string | undefined) {
       return lookupThreadMetadata(url, token);
     },
     staleTime: 5 * 60 * 1000
+  });
+}
+
+export function useThreadCommentsExport(threadId: number | undefined) {
+  const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!threadId) {
+        throw new Error('Thread id is required');
+      }
+      const token = await resolveToken(isAuthenticated, getAccessTokenSilently);
+      return downloadThreadCommentsCsv(threadId, token);
+    }
   });
 }
