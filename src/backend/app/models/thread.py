@@ -4,7 +4,7 @@ import enum
 import datetime as dt
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, Enum, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -49,6 +49,7 @@ class Thread(TimestampMixin, Base):
     )
     total_comments: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     synopsis: Mapped[Optional[str]] = mapped_column(Text)
+    is_episode_discussion: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_polled_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
     latest_comment_utc: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
     poll_interval_seconds: Mapped[int] = mapped_column(Integer, default=60, nullable=False)

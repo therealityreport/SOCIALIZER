@@ -5,7 +5,7 @@
  */
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Upload, Users, Link as LinkIcon, Save, Play } from 'lucide-react';
+import { CalendarDays, Upload, Users, Link as LinkIcon, Save, Play, Sparkles } from 'lucide-react';
 import { Alert } from '../ui/alert';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -14,8 +14,10 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Spinner } from '../ui/spinner';
+import { canonicalizeShowName } from '../../lib/showNames';
 
 type FormState = {
+  threadUrl: string;
   show: string;
   season: string;
   episode: string;
@@ -25,9 +27,11 @@ type FormState = {
   transcriptText: string;
   window: string;
   castIds: string;
+  title: string;
 };
 
 const initialForm: FormState = {
+  threadUrl: '',
   show: '',
   season: '',
   episode: '',
@@ -37,11 +41,14 @@ const initialForm: FormState = {
   transcriptText: '',
   window: 'DAY_OF',
   castIds: '',
+  title: '',
 };
 
 export function EpisodeDiscussionForm() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [autoFillMessage, setAutoFillMessage] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const navigate = useNavigate();
 
@@ -58,6 +65,61 @@ export function EpisodeDiscussionForm() {
 
   const handleWindowChange = (value: string) => {
     setForm((current) => ({ ...current, window: value }));
+  };
+
+  const handleAutoFill = async () => {
+    if (!form.threadUrl.trim()) {
+      setAutoFillMessage('Please enter a Thread URL first');
+      return;
+    }
+
+    setIsFetching(true);
+    setAutoFillMessage('Fetching thread data...');
+
+    try {
+      const response = await fetch(
+        `/api/v1/episode-discussions/fetch-reddit-metadata?url=${encodeURIComponent(form.threadUrl)}`
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        const errorMessage = typeof error.detail === 'string'
+          ? error.detail
+          : JSON.stringify(error.detail || error);
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+
+      // Convert posted_at to date format for date input (YYYY-MM-DD)
+      const postedDate = data.posted_at ? new Date(data.posted_at).toISOString().split('T')[0] : '';
+
+      // Canonicalize the show name using the alias system
+      const canonicalShow = data.show ? canonicalizeShowName(data.show) : '';
+
+      setForm((current) => ({
+        ...current,
+        title: data.title || '',
+        show: canonicalShow,
+        season: data.season ? String(data.season) : '',
+        episode: data.episode ? String(data.episode) : '',
+        date: postedDate,
+        transcriptText: data.synopsis || '',
+        links: data.url || current.threadUrl,
+      }));
+
+      setAutoFillMessage('✓ Title, show, season, episode, posted date, and synopsis loaded successfully!');
+      setTimeout(() => setAutoFillMessage(''), 5000);
+    } catch (error) {
+      const errorMsg = error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+        ? error
+        : 'Failed to fetch thread data';
+      setAutoFillMessage(`Error: ${errorMsg}`);
+    } finally {
+      setIsFetching(false);
+    }
   };
 
   const validateForm = (): string | null => {
@@ -108,7 +170,7 @@ export function EpisodeDiscussionForm() {
       };
 
       // Create episode discussion
-      const response = await fetch('/api/episode-discussions', {
+      const response = await fetch('/api/v1/episode-discussions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -123,7 +185,7 @@ export function EpisodeDiscussionForm() {
 
       // If "Save & Analyze" was clicked, trigger analysis
       if (saveAndAnalyze) {
-        const analyzeResponse = await fetch(`/api/episode-discussions/${discussion.id}/analyze`, {
+        const analyzeResponse = await fetch(`/api/v1/episode-discussions/${discussion.id}/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ force: false }),
@@ -148,7 +210,7 @@ export function EpisodeDiscussionForm() {
       // Reset form and navigate after success
       setTimeout(() => {
         setForm(initialForm);
-        navigate(`/episode-discussions/${discussion.id}`);
+        navigate('/threads');
       }, 1500);
     } catch (error) {
       setStatusMessage({
@@ -174,9 +236,69 @@ export function EpisodeDiscussionForm() {
       <CardContent>
         <form className="space-y-6">
           {statusMessage && (
-            <Alert variant={statusMessage.type === 'success' ? 'default' : 'destructive'}>
+            <Alert variant={statusMessage.type === 'success' ? 'success' : 'error'}>
               {statusMessage.message}
             </Alert>
+          )}
+
+          {/* Thread URL with Auto-Fill */}
+          <div className="space-y-2">
+            <Label htmlFor="threadUrl" className="flex items-center gap-2">
+              <LinkIcon className="h-4 w-4" />
+              Thread URL *
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="threadUrl"
+                name="threadUrl"
+                value={form.threadUrl}
+                onChange={handleChange}
+                placeholder="https://www.reddit.com/r/BravoRealHousewives/comments/..."
+                className="flex-1"
+                required
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleAutoFill}
+                disabled={isFetching || !form.threadUrl.trim()}
+              >
+                {isFetching ? (
+                  <>
+                    <Spinner className="mr-2 h-4 w-4" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Auto-Fill
+                  </>
+                )}
+              </Button>
+            </div>
+            {autoFillMessage && (
+              <p className={`text-sm ${autoFillMessage.startsWith('✓') ? 'text-green-600' : autoFillMessage.startsWith('Error') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {autoFillMessage}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              We'll pull the show name, season, episode, title, posted date, and synopsis automatically
+            </p>
+          </div>
+
+          {/* Title (Read-only after auto-fill) */}
+          {form.title && (
+            <div className="space-y-2">
+              <Label htmlFor="title">Thread Title</Label>
+              <Input
+                id="title"
+                name="title"
+                value={form.title}
+                onChange={handleChange}
+                readOnly
+                className="bg-muted"
+              />
+            </div>
           )}
 
           {/* Episode Metadata */}
@@ -225,7 +347,7 @@ export function EpisodeDiscussionForm() {
               <div className="space-y-2">
                 <Label htmlFor="date" className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4" />
-                  Air Date *
+                  Posted Time *
                 </Label>
                 <Input
                   id="date"
@@ -272,23 +394,23 @@ export function EpisodeDiscussionForm() {
             <p className="text-xs text-muted-foreground">Enter multiple URLs separated by commas or newlines</p>
           </div>
 
-          {/* Transcript */}
+          {/* Synopsis/Transcript */}
           <div className="space-y-2">
             <Label htmlFor="transcriptText" className="flex items-center gap-2">
               <Upload className="h-4 w-4" />
-              Episode Transcript *
+              Synopsis / Episode Transcript *
             </Label>
             <Textarea
               id="transcriptText"
               name="transcriptText"
               value={form.transcriptText}
               onChange={handleChange}
-              placeholder="Paste the full episode transcript here..."
+              placeholder="Auto-filled from thread, or paste episode transcript here..."
               rows={10}
               required
             />
             <p className="text-xs text-muted-foreground">
-              Supports plain text, VTT, SRT, or JSON formats
+              Auto-fills with thread body text, or paste full episode transcript
             </p>
           </div>
 

@@ -12,7 +12,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: true
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true
+      }
+    }
   },
   test: {
     globals: true,

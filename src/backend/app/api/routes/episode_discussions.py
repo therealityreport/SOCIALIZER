@@ -5,12 +5,15 @@ Endpoints for creating and managing episode-level discussions with transcript an
 from __future__ import annotations
 
 import logging
+import re
+from datetime import datetime
 from typing import Sequence
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.models.episode_discussion import DiscussionStatus, EpisodeDiscussion
@@ -28,10 +31,104 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/episode-discussions", tags=["episode-discussions"])
 
 
+@router.get("/fetch-reddit-metadata")
+async def fetch_reddit_metadata(
+    url: str = Query(..., description="Reddit thread URL"),
+):
+    """
+    Fetch metadata from a Reddit thread URL (title, posted time, body text)
+
+    Args:
+        url: Reddit thread URL
+
+    Returns:
+        Dictionary with title, posted_at, and synopsis
+    """
+    # Validate Reddit URL
+    reddit_pattern = r'https?://(?:www\.)?reddit\.com/r/[^/]+/comments/[a-z0-9]+/'
+    if not re.match(reddit_pattern, url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Reddit URL format",
+        )
+
+    try:
+        # Convert to JSON API URL
+        json_url = url.rstrip('/') + '.json'
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                json_url,
+                headers={'User-Agent': 'LTSR-Socializer/1.0'},
+                timeout=10.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        # Extract post data
+        post_data = data[0]['data']['children'][0]['data']
+
+        title = post_data.get('title', '')
+        created_utc = post_data.get('created_utc', 0)
+        selftext = post_data.get('selftext', '')
+
+        # Convert Unix timestamp to ISO format
+        posted_at = datetime.fromtimestamp(created_utc).isoformat() if created_utc else None
+
+        # Extract show name, season, and episode from title
+        show_name = None
+        season = None
+        episode = None
+
+        # Try to extract show name (everything before " - Season")
+        show_match = re.match(r'^(.+?)\s*-\s*Season', title, re.IGNORECASE)
+        if show_match:
+            show_name = show_match.group(1).strip()
+
+        # Try to extract season number
+        season_match = re.search(r'Season\s+(\d+)', title, re.IGNORECASE)
+        if season_match:
+            season = int(season_match.group(1))
+
+        # Try to extract episode number
+        episode_match = re.search(r'Episode\s+(\d+)', title, re.IGNORECASE)
+        if episode_match:
+            episode = int(episode_match.group(1))
+
+        return {
+            'title': title,
+            'show': show_name,
+            'season': season,
+            'episode': episode,
+            'posted_at': posted_at,
+            'synopsis': selftext,
+            'url': url,
+        }
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(f"HTTP error fetching Reddit data: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to fetch Reddit data: {exc.response.status_code}",
+        ) from exc
+    except httpx.TimeoutException as exc:
+        logger.error(f"Timeout fetching Reddit data: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Reddit request timed out",
+        ) from exc
+    except Exception as exc:
+        logger.error(f"Error fetching Reddit data: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch Reddit data: {str(exc)}",
+        ) from exc
+
+
 @router.post("", response_model=EpisodeDiscussionRead, status_code=status.HTTP_201_CREATED)
-async def create_episode_discussion(
+def create_episode_discussion(
     discussion_in: EpisodeDiscussionCreate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> EpisodeDiscussion:
     """
     Create a new episode discussion
@@ -60,10 +157,10 @@ async def create_episode_discussion(
 
     db.add(discussion)
     try:
-        await db.commit()
-        await db.refresh(discussion)
+        db.commit()
+        db.refresh(discussion)
     except IntegrityError as exc:
-        await db.rollback()
+        db.rollback()
         logger.error(f"Failed to create episode discussion: {exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,8 +172,8 @@ async def create_episode_discussion(
 
 
 @router.get("", response_model=list[EpisodeDiscussionRead])
-async def list_episode_discussions(
-    db: AsyncSession = Depends(get_db),
+def list_episode_discussions(
+    db: Session = Depends(get_db),
     show: str | None = Query(default=None, description="Filter by show"),
     status_filter: DiscussionStatus | None = Query(default=None, alias="status", description="Filter by status"),
     skip: int = Query(default=0, ge=0),
@@ -104,14 +201,14 @@ async def list_episode_discussions(
 
     query = query.offset(skip).limit(limit)
 
-    result = await db.execute(query)
+    result = db.execute(query)
     return list(result.scalars().all())
 
 
 @router.get("/{discussion_id}", response_model=EpisodeDiscussionRead)
-async def get_episode_discussion(
+def get_episode_discussion(
     discussion_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> EpisodeDiscussion:
     """
     Get a single episode discussion by ID
@@ -123,7 +220,7 @@ async def get_episode_discussion(
     Returns:
         Episode discussion
     """
-    discussion = await db.get(EpisodeDiscussion, discussion_id)
+    discussion = db.get(EpisodeDiscussion, discussion_id)
     if not discussion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -133,10 +230,10 @@ async def get_episode_discussion(
 
 
 @router.patch("/{discussion_id}", response_model=EpisodeDiscussionRead)
-async def update_episode_discussion(
+def update_episode_discussion(
     discussion_id: int,
     discussion_update: EpisodeDiscussionUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> EpisodeDiscussion:
     """
     Update an episode discussion
@@ -149,7 +246,7 @@ async def update_episode_discussion(
     Returns:
         Updated episode discussion
     """
-    discussion = await db.get(EpisodeDiscussion, discussion_id)
+    discussion = db.get(EpisodeDiscussion, discussion_id)
     if not discussion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -162,10 +259,10 @@ async def update_episode_discussion(
         setattr(discussion, field, value)
 
     try:
-        await db.commit()
-        await db.refresh(discussion)
+        db.commit()
+        db.refresh(discussion)
     except IntegrityError as exc:
-        await db.rollback()
+        db.rollback()
         logger.error(f"Failed to update episode discussion {discussion_id}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -176,11 +273,11 @@ async def update_episode_discussion(
     return discussion
 
 
-@router.delete("/{discussion_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_episode_discussion(
+@router.delete("/{discussion_id}")
+def delete_episode_discussion(
     discussion_id: int,
-    db: AsyncSession = Depends(get_db),
-) -> None:
+    db: Session = Depends(get_db),
+):
     """
     Delete an episode discussion
 
@@ -188,23 +285,23 @@ async def delete_episode_discussion(
         discussion_id: Episode discussion ID
         db: Database session
     """
-    discussion = await db.get(EpisodeDiscussion, discussion_id)
+    discussion = db.get(EpisodeDiscussion, discussion_id)
     if not discussion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Episode discussion {discussion_id} not found",
         )
 
-    await db.delete(discussion)
-    await db.commit()
+    db.delete(discussion)
+    db.commit()
     logger.info(f"Deleted episode discussion: {discussion_id}")
 
 
 @router.post("/{discussion_id}/analyze", response_model=EpisodeDiscussionAnalyzeResponse)
-async def analyze_episode_discussion(
+def analyze_episode_discussion(
     discussion_id: int,
     request: EpisodeDiscussionAnalyzeRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> EpisodeDiscussionAnalyzeResponse:
     """
     Trigger LLM analysis for an episode discussion
@@ -222,7 +319,7 @@ async def analyze_episode_discussion(
     Returns:
         Analysis response with new status
     """
-    discussion = await db.get(EpisodeDiscussion, discussion_id)
+    discussion = db.get(EpisodeDiscussion, discussion_id)
     if not discussion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -250,10 +347,10 @@ async def analyze_episode_discussion(
     discussion.error_message = None
 
     try:
-        await db.commit()
-        await db.refresh(discussion)
+        db.commit()
+        db.refresh(discussion)
     except Exception as exc:
-        await db.rollback()
+        db.rollback()
         logger.error(f"Failed to update status for discussion {discussion_id}: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -274,9 +371,9 @@ async def analyze_episode_discussion(
 
 
 @router.get("/{discussion_id}/mentions")
-async def get_episode_discussion_mentions(
+def get_episode_discussion_mentions(
     discussion_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
     cast_id: int | None = Query(default=None, description="Filter by cast member ID"),
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
@@ -294,7 +391,7 @@ async def get_episode_discussion_mentions(
     Returns:
         List of mentions with sentiment analysis
     """
-    discussion = await db.get(EpisodeDiscussion, discussion_id)
+    discussion = db.get(EpisodeDiscussion, discussion_id)
     if not discussion:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -308,7 +405,7 @@ async def get_episode_discussion_mentions(
     # if cast_id:
     #     query = query.where(Mention.cast_member_id == cast_id)
     # query = query.offset(skip).limit(limit)
-    # result = await db.execute(query)
+    # result = db.execute(query)
     # return list(result.scalars().all())
 
     return {

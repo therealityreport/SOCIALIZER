@@ -41,3 +41,9 @@ export function Alert({ className, variant, title, children, ...props }: AlertPr
     </div>
   );
 }
+
+export interface AlertDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {}
+
+export function AlertDescription({ className, ...props }: AlertDescriptionProps) {
+  return <p className={cn('text-sm leading-relaxed', className)} {...props} />;
+}

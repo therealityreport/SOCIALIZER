@@ -1,9 +1,9 @@
-import { ThreadCreateForm } from '../components/threads/thread-create-form';
+import { EpisodeDiscussionForm } from '../components/episodes/episode-discussion-form';
 
 export default function TrackThreadPage() {
   return (
     <div className="space-y-6">
-      <ThreadCreateForm />
+      <EpisodeDiscussionForm />
     </div>
   );
 }

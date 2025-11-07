@@ -39,7 +39,7 @@ export default function EpisodeDiscussionDetailPage() {
 
     const fetchDiscussion = async () => {
       try {
-        const response = await fetch(`/api/episode-discussions/${id}`);
+        const response = await fetch(`/api/v1/episode-discussions/${id}`);
         if (!response.ok) {
           throw new Error('Failed to fetch episode discussion');
         }

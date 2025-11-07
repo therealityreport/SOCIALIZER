@@ -6,11 +6,11 @@ import { cn } from '../../lib/utils';
 
 export const appNavigation = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-  { label: 'Episodes', to: '/threads', icon: Users },
+  { label: 'Threads', to: '/threads', icon: Users },
   { label: 'Shows', to: '/shows', icon: Tv },
   { label: 'Communities', to: '/communities', icon: Globe2 },
   { label: 'Cast roster', to: '/cast-roster', icon: ContactRound },
-  { label: 'Track live thread', to: '/threads/new', icon: PlusCircle },
+  { label: 'Add Thread', to: '/threads/new', icon: PlusCircle },
   { label: 'Admin', to: '/admin', icon: Shield }
 ];
 

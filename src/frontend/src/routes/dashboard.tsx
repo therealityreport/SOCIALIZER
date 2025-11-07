@@ -7,8 +7,8 @@ import { Alert } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Spinner } from '../components/ui/spinner';
-import { ThreadCreateForm } from '../components/threads/thread-create-form';
 import { ThreadList } from '../components/threads/thread-list';
+import { EpisodeDiscussionForm } from '../components/episodes/episode-discussion-form';
 import type { Thread, CommentListResponse } from '../lib/api/types';
 
 export default function Dashboard() {
@@ -67,7 +67,7 @@ export default function Dashboard() {
         />
       </div>
 
-      <ThreadCreateForm />
+      <EpisodeDiscussionForm />
 
       {isLoading ? <Spinner label="Loading tracked threads..." /> : null}
       {isError ? <Alert variant="error">{error?.message ?? 'Unable to fetch threads.'}</Alert> : null}
