@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-import emoji
+try:
+    import emoji
+except Exception as exc:  # pragma: no cover - import guard
+    raise RuntimeError("emoji package is required. Install with: pip install emoji") from exc
 
 
 @dataclass

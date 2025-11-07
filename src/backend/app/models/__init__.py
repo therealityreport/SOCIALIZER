@@ -9,6 +9,7 @@ from app.models.episode_discussion import (
     Platform,
 )
 from app.models.export import Export, ExportFormat
+from app.models.instagram import InstagramPost, InstagramPostHashtag, InstagramProfile, InstagramRun
 from app.models.mention import Mention
 from app.models.reddit_thread import RedditThread
 from app.models.thread import Thread
@@ -26,6 +27,10 @@ __all__ = [
     "EpisodeDiscussion",
     "Export",
     "ExportFormat",
+    "InstagramPost",
+    "InstagramPostHashtag",
+    "InstagramProfile",
+    "InstagramRun",
     "Mention",
     "Platform",
     "RedditThread",

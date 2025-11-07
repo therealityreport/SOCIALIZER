@@ -154,6 +154,54 @@ This document summarizes the primary REST endpoints exposed by the SOCIALIZER ba
 - **Purpose:** Download an export; `Content-Type` is `text/csv` or `application/json`.
 - **Response:** Streaming payload with `Content-Disposition` download header or `404`.
 
+## Instagram Ingest
+
+### POST `/ingest/instagram/profiles`
+- **Purpose:** Call Apify's `instagram-profile-scraper`, filter posts by date/tags/engagement, and optionally persist the normalized posts.
+- **Request Body:**
+  ```json
+  {
+    "usernames": ["BravoTV"],
+    "startDate": "2025-09-01",
+    "endDate": "2025-11-07",
+    "includeTags": ["bravo"],
+    "excludeTags": [],
+    "minLikes": 25,
+    "minComments": 5,
+    "maxPostsPerUsername": 500,
+    "includeAbout": false,
+    "dryRun": true
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "actor": {
+      "runId": "abc123",
+      "startedAt": "2025-11-07T16:04:00Z",
+      "finishedAt": "2025-11-07T16:06:00Z",
+      "status": "SUCCEEDED"
+    },
+    "perUsername": {
+      "BravoTV": {
+        "fetched": 120,
+        "kept": 12,
+        "skipped": {
+          "date": 40,
+          "inc_tag": 30,
+          "exc_tag": 5,
+          "likes": 10,
+          "comments": 5,
+          "private": 20,
+          "other": 0
+        }
+      }
+    },
+    "itemsKept": 12
+  }
+  ```
+- **Notes:** Requires `APIFY_TOKEN`. When `dryRun=false`, the backend upserts `instagram_profiles`, `instagram_posts`, `instagram_post_hashtags`, and records a row in `instagram_runs`.
+
 ## Health
 
 - **GET `/healthz`** — Simple liveness check (`{"status":"ok"}`).
@@ -187,6 +235,7 @@ Validation problems return a list in `detail` describing field validation issues
 | `GET /cast/{slug}/history`        | 200     | 404 cast missing                 |
 | `POST /exports/{csv,json}`        | 201     | 404 thread missing               |
 | `GET /exports/{id}`               | 200     | 404 export missing               |
+| `POST /ingest/instagram/profiles` | 200     | 400 validation, 502 actor error  |
 | `/healthz`, `/api/v1/health`      | 200     | —                                |
 
 This reference should be kept in sync with the OpenAPI schema at `/docs` once staging is live.

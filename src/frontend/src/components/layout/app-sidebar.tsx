@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Shield, ContactRound, Tv, Globe2, PlusCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, ContactRound, Tv, Globe2, PlusCircle, Instagram } from 'lucide-react';
 
 import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
@@ -11,6 +11,7 @@ export const appNavigation = [
   { label: 'Communities', to: '/communities', icon: Globe2 },
   { label: 'Cast roster', to: '/cast-roster', icon: ContactRound },
   { label: 'Add Thread', to: '/threads/new', icon: PlusCircle },
+  { label: 'Instagram ingest', to: '/instagram/ingest', icon: Instagram },
   { label: 'Admin', to: '/admin', icon: Shield }
 ];
 

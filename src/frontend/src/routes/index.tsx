@@ -15,6 +15,7 @@ import { ProtectedRoute } from './protected-route';
 import TrackThreadPage from './thread-new';
 import ShowsPage from './shows';
 import CommunitiesPage from './communities';
+import InstagramIngestPage from '../pages/instagram/ingest';
 
 export const routes: RouteObject[] = [
   {
@@ -30,6 +31,7 @@ export const routes: RouteObject[] = [
       { path: 'shows', element: <ShowsPage /> },
       { path: 'communities', element: <CommunitiesPage /> },
       { path: 'cast-roster', element: <CastRosterPage /> },
+      { path: 'instagram/ingest', element: <InstagramIngestPage /> },
       { path: 'admin', element: <Admin /> },
       {
         path: 'profile',

@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     celery_worker_prefetch_multiplier: int = Field(default=1, alias="CELERY_WORKER_PREFETCH_MULTIPLIER")
     flower_port: int = Field(default=5555, alias="FLOWER_PORT")
 
+    apify_token: str | None = Field(default=None, alias="APIFY_TOKEN")
+
     reddit_client_id: str = Field(default="", alias="REDDIT_CLIENT_ID")
     reddit_client_secret: str = Field(default="", alias="REDDIT_CLIENT_SECRET")
     reddit_user_agent: str = Field(default="SOCIALIZER/1.0 (by u/unknown)", alias="REDDIT_USER_AGENT")
@@ -198,6 +200,14 @@ class Settings(BaseSettings):
         return self.huggingface_access_token or self.huggingface_api_key
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()  # type: ignore[arg-type]
+
+
+def is_dev() -> bool:
+    try:
+        env = (get_settings().env or os.getenv("ENV", "dev")).lower()
+        return env in {"dev", "development", "local"}
+    except Exception:
+        return True

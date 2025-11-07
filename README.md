@@ -40,6 +40,7 @@ cd socializer
 
 # Copy base environment file and adjust as needed
 cp .env.example .env
+# Required for Instagram ingestion: set `APIFY_TOKEN` in `.env` to an Apify API token that can run `apify/instagram-profile-scraper`.
 
 # Backend dependencies
 python -m venv .venv
@@ -73,6 +74,7 @@ Ready to move past local development? Follow the [Staging Deployment Guide](docs
 
 - **Celery Flower** ships in the default stack (`http://localhost:5555`) for queue monitoring.
 - **Bulk ingestion**: `python scripts/bulk_enqueue_threads.py threads.txt --subreddit BravoRealHousewives` enqueues every Reddit thread in the file; pass `--dry-run` to preview.
+- **Instagram ingest**: Visit `/instagram/ingest` to run Apify pulls with hashtag/date filters once `APIFY_TOKEN` is configured.
 
 ## 🏗️ Architecture
 

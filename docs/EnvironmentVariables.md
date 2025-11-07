@@ -35,6 +35,10 @@ This document summarizes the environment variables consumed by the SOCIALIZER pl
 - `CELERY_WORKER_PREFETCH_MULTIPLIER`: Worker prefetch behaviour.
 - `FLOWER_PORT`: Flower monitoring web UI port.
 
+### Instagram / Apify
+
+- `APIFY_TOKEN`: Apify API token with rights to run `apify/instagram-profile-scraper`. Required for `/api/v1/ingest/instagram/profiles` and the `/instagram/ingest` UI.
+
 ### Reddit API
 
 - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT`: OAuth credentials.
